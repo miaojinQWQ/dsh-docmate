@@ -86,6 +86,17 @@ Client 片段一览（**文件名前缀就是拼接顺序**）：
 - **`index.json` 读坏了要回退 `.bak`**，不能直接 500——否则面板连文档列表都打不开。
 - **`memory.md` 的所有写入走 `withMemoryLock`**：自动流水是「读-改-写」，和面板手存并发会互相覆盖。
 
+### 2.2 打包不变量（别把安装搞挂）
+
+- **`package.json` 里绝对不要加 `prepare`**。pnpm 默认**阻止** git 托管的构建脚本，加了 `prepare`
+  之后 `dsh plugin add github:miaojinQWQ/dsh-docmate` 会直接失败，还要求用户手改
+  `pnpm-workspace.yaml` 的 `allowBuilds`——陌生人到这一步就走了。
+  `client.js` 是**提交进仓库**的构建产物，安装时不需要任何构建步骤。
+  （这条踩过：加过 `prepare`，实测安装失败，删掉后 7.7 秒装好。）
+- `prepack` / `prepublishOnly` 只在 `npm pack` / `npm publish` 时跑，不影响 git 安装，可以留。
+- `files` 只放运行时真正需要的：`index.js` / `client.js` / `cordis.patch.yml` / `src/**` /
+  `assets/**` / `locale` / `icon.svg` / `LICENSE` / `README.md`。`docs/`、`test/`、`shots/` 不进包。
+
 ## 3. 开发循环
 
 ```powershell

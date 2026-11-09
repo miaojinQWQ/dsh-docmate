@@ -40,8 +40,18 @@ gh repo create dsh-docmate --public --source=. --remote=origin --push
 
 ## 2. 发 npm
 
+> **国内网络提示**：`www.npmjs.com`（网页）经常被挡，但 `registry.npmjs.org`（真正发包的服务器）
+> 通常是通的——先 `npm ping` 确认。网页打不开**不影响发布**，只要用**纯命令行登录**：
+>
+> ```powershell
+> npm login --auth-type=legacy
+> ```
+>
+> 它会在终端里依次问 Username / Password / OTP，全程不碰网页。
+> 如果账号开了两步验证而发布时又要求 OTP，就在终端里自己跑一次 `npm publish`。
+
 ```powershell
-npm login          # 需要你自己登录，agent 做不了
+npm login          # 交互终端里做；网页打不开就用上面的 legacy 方式
 npm publish        # prepublishOnly 会先跑一遍检查
 ```
 
@@ -52,8 +62,11 @@ npm publish        # prepublishOnly 会先跑一遍检查
 
 ```powershell
 npm view dsh-docmate version
-npx -y dsh-docmate --help 2>$null   # 不用管报错，能解析到包就说明发布成功
 ```
+
+> **没有 npm 账号也能发布成功**：市场收录不依赖 npm，插件从 GitHub 装照样能用
+> （`dsh plugin --profile <p> add github:miaojinQWQ/dsh-docmate`，已实测 7.7 秒装好）。
+> npm 只是让市场卡片多一个下载量数字。
 
 ## 3. 提交到插件市场（关键的一步）
 
