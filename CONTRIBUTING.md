@@ -23,7 +23,7 @@ docmate\
   src/host/docx.js      # docx → HTML（零依赖）
   assets/pdfjs/         # pdf.js 3.11.174 + 168 个 cMap
   assets/katex/         # katex.min.js（公式运行时；样式/字体复用宿主前端）
-  test/host.test.mjs    # 81 项
+  test/host.test.mjs    # 89 项
   test/client.test.mjs  # 26 项
   src/host/docx.test.mjs            # 59 项
   src/client/30-markdown.test.mjs   # 81 组
@@ -69,14 +69,29 @@ Client 片段一览（**文件名前缀就是拼接顺序**）：
    插件自己的数据只在 `<DSH_HOME>/docmate/`。
 5. **不要动** `docs/` 里的样本和用户的文档数据（`<DSH_HOME>/docmate/docs/`）。
 6. 不引入新依赖；要 vendor 的东西放 `assets/`，通过 `/api/docmate/asset/*` 提供。
-7. 改完必须：`node build.mjs --check` + 五套测试全绿。
+7. 改完必须：`node build.mjs --check` + 全部 7 套测试全绿。
+
+### 2.1 安全不变量（改 `index.js` 时别破坏）
+
+这几条是发布前审计封住的，都有对应的测试，别为了图省事绕过去：
+
+- **每个路由都过 `admit()`，且 fail-closed**：拿不到 `connection` 就返回 403，不是放行。
+  这组路由能删文档、能往会话里发消息，没鉴权等于任意网页可以 CSRF。
+- **用户上传的字节永远不能按 `text/html` 回出去**。`/doc/raw` 只对 pdf / png / jpg / gif / webp
+  内联，其余一律 `text/plain` + `nosniff` + `Content-Disposition: attachment`。
+- **请求体边读边数**（`nodeToRequest`）：先 `Buffer.concat` 再查大小的话，一个几 GB 的 POST
+  就能把宿主进程 OOM 掉。
+- **任何拼进文件路径的 id 都要先过 `/^[\w-]+$/`**，再用 `path.relative` 确认落在目标目录内
+  （`removeDoc` 就是这么防路径穿越的）。
+- **`index.json` 读坏了要回退 `.bak`**，不能直接 500——否则面板连文档列表都打不开。
+- **`memory.md` 的所有写入走 `withMemoryLock`**：自动流水是「读-改-写」，和面板手存并发会互相覆盖。
 
 ## 3. 开发循环
 
 ```powershell
 cd docmate
 node build.mjs --check          # 拼 bundle + node --check
-node test\host.test.mjs         # 81
+node test\host.test.mjs         # 89
 node test\client.test.mjs       # 26
 node src\host\docx.test.mjs     # 59
 node src\client\30-markdown.test.mjs   # 81 组

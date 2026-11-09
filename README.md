@@ -161,7 +161,7 @@ npm test                               # 全部 7 套测试
 - 改 `src/client/**` → `node build.mjs` → **刷新页面**。
 - 改 `index.js` → 重载插件（关再开 `include:docmate`）。
 
-测试规模：host 81 / client 26 / docx 59 / markdown 81 / find 44 / shot 35 / panes 48。
+测试规模：host 89 / client 26 / docx 59 / markdown 81 / find 44 / shot 35 / panes 48。
 
 贡献前请读 **[CONTRIBUTING.md](CONTRIBUTING.md)**（架构、硬约束、开发循环、验收方法）和
 **[CONTRACT.md](CONTRACT.md)**（Client 片段的模块契约）。
