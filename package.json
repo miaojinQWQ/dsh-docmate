@@ -4,13 +4,13 @@
   "description": "DocMate 伴读 — an immersive reading desk for DeepSeek Harness: md / docx / pdf in the centre, a companion AI on the right that has already read the whole document.",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://github.com/CHANGE-ME/dsh-docmate#readme",
+  "homepage": "https://github.com/miaojinQWQ/dsh-docmate#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CHANGE-ME/dsh-docmate.git"
+    "url": "git+https://github.com/miaojinQWQ/dsh-docmate.git"
   },
   "bugs": {
-    "url": "https://github.com/CHANGE-ME/dsh-docmate/issues"
+    "url": "https://github.com/miaojinQWQ/dsh-docmate/issues"
   },
   "keywords": [
     "dsh",

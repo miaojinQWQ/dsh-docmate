@@ -9,23 +9,20 @@
 
 ---
 
-## 0. 先确认一件事：仓库地址
+## 0. 仓库地址（已填好）
 
-`package.json` 里有三处 `CHANGE-ME` 占位：
+`package.json` 里的三处已经指向 `miaojinQWQ`：
 
 ```json
-"homepage": "https://github.com/CHANGE-ME/dsh-docmate#readme",
-"repository": { "url": "git+https://github.com/CHANGE-ME/dsh-docmate.git" },
-"bugs": { "url": "https://github.com/CHANGE-ME/dsh-docmate/issues" }
+"homepage": "https://github.com/miaojinQWQ/dsh-docmate#readme",
+"repository": { "url": "git+https://github.com/miaojinQWQ/dsh-docmate.git" },
+"bugs": { "url": "https://github.com/miaojinQWQ/dsh-docmate/issues" }
 ```
 
-把 `CHANGE-ME` 换成你的 GitHub 用户名。**没换的话 `npm publish` 会被 `prepublishOnly` 直接挡下来**
-（`scripts/prepublish.mjs` 会报错退出），这是故意的：带着假地址发出去的包，市场卡片会链到不存在的仓库。
+`scripts/prepublish.mjs` 会挡住「还是占位地址」的发布，所以 `npm publish` 之前先跑一次：
 
 ```powershell
 cd docmate
-# 三处一起换（把 <you> 换成你的 GitHub 用户名）
-(Get-Content package.json -Raw) -replace 'CHANGE-ME', '<you>' | Set-Content package.json -NoNewline
 npm run prepublishOnly     # 应该输出「✓ 发布前检查通过」
 ```
 
@@ -33,12 +30,10 @@ npm run prepublishOnly     # 应该输出「✓ 发布前检查通过」
 
 ```powershell
 cd docmate
-git init
-git add -A
-git commit -m "DocMate 伴读 1.0.0 — immersive reading desk for DeepSeek Harness"
-git branch -M main
-git remote add origin https://github.com/<you>/dsh-docmate.git
-git push -u origin main
+gh repo create dsh-docmate --public --source=. --remote=origin --push
+# 没有 gh 的话：
+#   git remote add origin https://github.com/miaojinQWQ/dsh-docmate.git
+#   git push -u origin main
 ```
 
 推完在仓库 **Settings → Topics** 里加 `dsh-plugin`（市场收录会看这个 topic）。
@@ -66,11 +61,11 @@ npx -y dsh-docmate --help 2>$null   # 不用管报错，能解析到包就说明
 [awesome-dsh-plugin/awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)。
 流程是「一个插件 = 一个 YAML 文件」的 PR。
 
-### 3.1 新建 `data/plugins/<you>__dsh-docmate.yml`
+### 3.1 新建 `data/plugins/miaojinQWQ__dsh-docmate.yml`
 
 ```yaml
-url: https://github.com/<you>/dsh-docmate
-name: <you>/dsh-docmate
+url: https://github.com/miaojinQWQ/dsh-docmate
+name: miaojinQWQ/dsh-docmate
 category: docs
 description:
   en: 'Immersive reading desk for DeepSeek Harness: drop a md/docx/pdf into the centre pane and a companion AI on the right has already read the whole document. Select any sentence to ask, drag a box over a scanned page to let it look, keep highlights and a per-document research memory that survives restarts. KaTeX math, outline, in-document search, draggable panes, and a hard runtime brake on image questions.'
@@ -83,7 +78,7 @@ description:
 ### 3.2 PR 描述（照抄 `pr-body.md` 那份模板的格式）
 
 ```markdown
-- [x] I added **one file** at `data/plugins/<you>__dsh-docmate.yml` — that single file is the whole submission.
+- [x] I added **one file** at `data/plugins/miaojinQWQ__dsh-docmate.yml` — that single file is the whole submission.
 - [x] My repo's `package.json` declares **`dsh.bundle`** (`dsh.bundle.patch: ./cordis.patch.yml`, plus `dsh.client` for the browser half).
 - [x] My repo is at least **1 day old** — created <日期>.
 - [x] `category: docs` — it is a document reader with a companion AI.
