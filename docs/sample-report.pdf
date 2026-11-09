@@ -1,0 +1,120 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Length 804 >>
+stream
+BT
+/F1 20 Tf
+56 780 Td
+(DocMate Sample Report) Tj
+/F1 11 Tf
+0 -34 Td
+14 TL
+(This PDF exists so the reader can be checked end to end:) Tj
+T*
+(pdf.js must render the page, and the text layer must let a) Tj
+T*
+(reader select a sentence with the mouse.) Tj
+T*
+() Tj
+T*
+(1. Background) Tj
+T*
+(A companion reading desk puts the document in the centre and) Tj
+T*
+(the assistant on the right. The assistant only earns its place) Tj
+T*
+(if it knows what the reader is looking at, which means the) Tj
+T*
+(selection has to travel with the question.) Tj
+T*
+() Tj
+T*
+(2. Method) Tj
+T*
+(The panel keeps one ordinary Harness session alive. Every) Tj
+T*
+(selection becomes one user message: the quoted passage first,) Tj
+T*
+(then the question. Nothing else is invented.) Tj
+T*
+ET
+BT
+/F1 9 Tf
+56 40 Td
+(Page 1 of 2) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 590 >>
+stream
+BT
+/F1 20 Tf
+56 780 Td
+(Page two - layout checks) Tj
+/F1 11 Tf
+0 -34 Td
+14 TL
+(Long lines wrap inside the page box, and the text layer keeps) Tj
+T*
+(its spans aligned with the glyphs underneath.) Tj
+T*
+() Tj
+T*
+(   - bullet one) Tj
+T*
+(   - bullet two) Tj
+T*
+(   - bullet three) Tj
+T*
+() Tj
+T*
+(A second page also proves the lazy renderer mounts pages that) Tj
+T*
+(start off-screen, and that the page counter stays honest.) Tj
+T*
+() Tj
+T*
+(Numbers: 3.14159  2.71828  1.41421) Tj
+T*
+(Mixed case: The Quick Brown Fox Jumps Over The Lazy Dog.) Tj
+T*
+ET
+BT
+/F1 9 Tf
+56 40 Td
+(Page 2 of 2) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000224 00000 n 
+0000001079 00000 n 
+0000001205 00000 n 
+0000001846 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1972
+%%EOF

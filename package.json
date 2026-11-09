@@ -1,0 +1,77 @@
+{
+  "name": "dsh-docmate",
+  "version": "1.0.0",
+  "description": "DocMate 伴读 — an immersive reading desk for DeepSeek Harness: md / docx / pdf in the centre, a companion AI on the right that has already read the whole document.",
+  "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/CHANGE-ME/dsh-docmate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CHANGE-ME/dsh-docmate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/CHANGE-ME/dsh-docmate/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek",
+    "harness",
+    "reader",
+    "pdf",
+    "docx",
+    "markdown",
+    "study",
+    "reading",
+    "companion",
+    "ai-tutor"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.1"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "src/**",
+    "assets/**",
+    "locale/*.json",
+    "icon.svg",
+    "LICENSE",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-api-session-controller"
+      ]
+    }
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node build.mjs --check",
+    "test": "node test/host.test.mjs && node test/client.test.mjs && node src/host/docx.test.mjs && node src/client/30-markdown.test.mjs && node src/client/58-find.test.mjs && node src/client/48-shot.test.mjs && node src/client/12-panes.test.mjs",
+    "prepare": "node build.mjs",
+    "prepack": "node build.mjs --check",
+    "prepublishOnly": "node scripts/prepublish.mjs"
+  }
+}

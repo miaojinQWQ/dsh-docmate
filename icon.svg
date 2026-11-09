@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="DocMate">
+  <defs>
+    <linearGradient id="dm-g" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2f8fd8"/>
+      <stop offset="1" stop-color="#1b4f7d"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#dm-g)"/>
+  <path d="M17 18.5A3.5 3.5 0 0 1 20.5 15H41v28H20.5A3.5 3.5 0 0 0 17 46.5Z"
+        fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M17 46.5A3.5 3.5 0 0 1 20.5 43H41v6H20.5"
+        fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="M25 23h10M25 29h7" stroke="#bfe2ff" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M47 20.5l1.6 4.4 4.4 1.6-4.4 1.6L47 32.5l-1.6-4.4L41 26.5l4.4-1.6Z"
+        fill="#ffd66b"/>
+</svg>

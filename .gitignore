@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# build scratch
+*.tgz
+dist/
+
+# local verification artefacts
+shots/*.tmp.png
+shots/tmp-*
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
