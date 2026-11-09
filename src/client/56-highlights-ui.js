@@ -7,7 +7,13 @@
  * note editor. Purely presentational: the shell owns the HTTP routes, the anchor engine
  * (`52-highlights.js`) and the selection bar. The only ways out are the callbacks.
  *
- * Exposed as `createHighlightsUi(React, util) -> { HighlightList, HighlightsCss }`.
+ * It also owns "review mode": a card-by-card pass over the hand-drawn marks, ordered
+ * 待复习 -> 疑问 -> 重点 (oldest first inside one colour, never random). The planning bits
+ * are pure functions (`planReview` / `reviewSummary` / `stepReview`) exported next to the
+ * component so they can be unit-tested without a DOM.
+ *
+ * Exposed as `createHighlightsUi(React, util) ->
+ * { HighlightList, HighlightsCss, planReview, reviewSummary, stepReview }`.
  * `HighlightsCss` is a plain string; the shell appends it to the plugin stylesheet.
  */
 function createHighlightsUi(React, util) {
@@ -99,6 +105,85 @@ function createHighlightsUi(React, util) {
     return date.getFullYear() === thisYear ? monthDay : date.getFullYear() + '年' + monthDay;
   }
 
+  /* ── review mode: pure planning helpers ──────────────────────────────── */
+
+  /** Review order: 待复习 first, then 疑问, then 重点. Unknown colours go last. */
+  const REVIEW_RANK = { review: 0, question: 1, key: 2 };
+
+  function reviewRank(color) {
+    if (!Object.prototype.hasOwnProperty.call(REVIEW_RANK, color)) return 3;
+    return REVIEW_RANK[color];
+  }
+
+  function timeOf(item) {
+    const stamp = Number(item && item.createdAt);
+    return isFinite(stamp) ? stamp : 0;
+  }
+
+  function idKeyOf(item) {
+    return item && item.id !== undefined && item.id !== null ? String(item.id) : '';
+  }
+
+  /**
+   * The queue review mode walks through: only hand-drawn marks (`kind === 'mark'`) that
+   * actually carry text, ordered 待复习 -> 疑问 -> 重点 and, inside one colour, oldest
+   * first. The order is fully deterministic (same input -> same queue, never random) so
+   * the reader can predict what comes next; `createdAt` ties fall back to the id.
+   */
+  function planReview(items) {
+    const list = Array.isArray(items) ? items : [];
+    const queue = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const item = list[index];
+      if (!item || item.kind !== 'mark') continue;
+      if (typeof item.text !== 'string' || item.text.trim() === '') continue;
+      queue.push(item);
+    }
+    queue.sort(function compare(a, b) {
+      const rankA = reviewRank(a && a.color);
+      const rankB = reviewRank(b && b.color);
+      if (rankA !== rankB) return rankA - rankB;
+      const timeA = timeOf(a);
+      const timeB = timeOf(b);
+      if (timeA !== timeB) return timeA - timeB;
+      const idA = idKeyOf(a);
+      const idB = idKeyOf(b);
+      if (idA === idB) return 0;
+      return idA < idB ? -1 : 1;
+    });
+    return queue;
+  }
+
+  /**
+   * Tally for the summary page. `results` is the sparse per-card verdict list review mode
+   * keeps (index = card position, value = 'known' | 'forgot'); holes and unknown values are
+   * ignored so skipping cards never inflates the count.
+   */
+  function reviewSummary(results) {
+    const list = Array.isArray(results) ? results : [];
+    let total = 0;
+    let forgot = 0;
+    for (let index = 0; index < list.length; index += 1) {
+      const verdict = list[index];
+      if (verdict !== 'known' && verdict !== 'forgot') continue;
+      total += 1;
+      if (verdict === 'forgot') forgot += 1;
+    }
+    return { total: total, forgot: forgot };
+  }
+
+  /** Move one card without wrapping: the result is always clamped into [0, total - 1]. */
+  function stepReview(index, total, delta) {
+    const count = Number(total);
+    if (!isFinite(count) || count <= 0) return 0;
+    const size = Math.floor(count);
+    const current = Number(index);
+    const base = isFinite(current) ? Math.floor(current) : 0;
+    const move = Number(delta);
+    const step = isFinite(move) ? Math.trunc(move) : 0;
+    return Math.min(size - 1, Math.max(0, base + step));
+  }
+
   /* ── the list ────────────────────────────────────────────────────────── */
 
   /**
@@ -117,12 +202,23 @@ function createHighlightsUi(React, util) {
     const onNote = p.onNote;
     const onAskAbout = p.onAskAbout;
     const onAskAll = p.onAskAll;
+    const onReview = p.onReview;
 
     const [open, setOpen] = useState(true);
     const [filter, setFilter] = useState(FILTER_ALL);
     const [editingId, setEditingId] = useState(null);
     const [noteDraft, setNoteDraft] = useState('');
     const rowRefs = useRef({});
+
+    // Review mode. `reviewQueue` is a frozen snapshot taken when the pass starts (the
+    // shell rewrites `items` after every "忘了", which would otherwise reshuffle the deck
+    // mid-pass); "再来一遍" re-plans from the current items on purpose.
+    const [reviewing, setReviewing] = useState(false);
+    const [reviewQueue, setReviewQueue] = useState([]);
+    const [reviewIndex, setReviewIndex] = useState(0);
+    const [reviewResults, setReviewResults] = useState([]);
+    const [reviewDone, setReviewDone] = useState(false);
+    const [showNote, setShowNote] = useState(false);
 
     // Keep the active row visible when the shell jumps to a highlight from somewhere else.
     useEffect(() => {
@@ -136,7 +232,160 @@ function createHighlightsUi(React, util) {
       }
     }, [activeId, open, filter]);
 
+    /* ── review mode ───────────────────────────────────────────────────── */
+
+    /**
+     * Drop the frozen queue when the document changes underneath it (the shell keeps one
+     * highlight list per document, so every id from the old queue disappears at once).
+     * A colour rewrite after "忘了" keeps the ids, so the pass survives it.
+     */
+    useEffect(() => {
+      if (!reviewing || !reviewQueue.length) return;
+      const first = reviewQueue[0];
+      const stillThere = items.some((item) => item && sameId(item.id, first.id));
+      if (!stillThere) exitReview();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [items, reviewing, reviewQueue]);
+
+    /**
+     * Review-mode keyboard: arrows / J-K move, 1 / 2 answer, Esc exits. A document-level
+     * listener is used so the shortcuts work without focusing the panel first; anything
+     * typed into an input, textarea or contenteditable is left alone.
+     *
+     * Mapping follows the spec literally: ← / J = 上一条, → / K = 下一条.
+     */
+    useEffect(() => {
+      if (!reviewing) return undefined;
+      if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return undefined;
+      function onKeyDown(event) {
+        if (!event) return;
+        const target = event.target;
+        if (target) {
+          const tag = String(target.tagName || '').toUpperCase();
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+        }
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const key = event.key;
+        if (key === 'Escape') {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          exitReview();
+          return;
+        }
+        if (reviewDone) return;
+        // 方向键按位置走；J/K 按 vim 习惯走（j = 下一条、k = 上一条），
+        // 这两套在别的学习工具里也是这么用的，别反过来。
+        if (key === 'ArrowLeft' || key === 'k' || key === 'K') {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          goPrev();
+        } else if (key === 'ArrowRight' || key === 'j' || key === 'J') {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          goNext();
+        } else if (key === '1') {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          markKnown();
+        } else if (key === '2') {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          markForgot();
+        }
+      }
+      document.addEventListener('keydown', onKeyDown);
+      return function cleanup() {
+        document.removeEventListener('keydown', onKeyDown);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [reviewing, reviewDone, reviewIndex, reviewQueue, onReview]);
+
+    function startReview() {
+      const queue = planReview(items);
+      if (!queue.length) return;
+      setReviewQueue(queue);
+      setReviewIndex(0);
+      setReviewResults([]);
+      setReviewDone(false);
+      setShowNote(false);
+      setReviewing(true);
+    }
+
+    function exitReview() {
+      setReviewing(false);
+      setReviewQueue([]);
+      setReviewIndex(0);
+      setReviewResults([]);
+      setReviewDone(false);
+      setShowNote(false);
+    }
+
+    function restartReview() {
+      const queue = planReview(items);
+      if (!queue.length) {
+        exitReview();
+        return;
+      }
+      setReviewQueue(queue);
+      setReviewIndex(0);
+      setReviewResults([]);
+      setReviewDone(false);
+      setShowNote(false);
+      setReviewing(true);
+    }
+
+    /** Store the verdict at the card's own index: re-answering a card replaces it. */
+    function recordVerdict(verdict) {
+      setReviewResults(function update(current) {
+        const next = Array.isArray(current) ? current.slice() : [];
+        next[reviewIndex] = verdict;
+        return next;
+      });
+    }
+
+    function advanceReview() {
+      const next = stepReview(reviewIndex, reviewQueue.length, 1);
+      setShowNote(false);
+      if (next === reviewIndex && reviewIndex >= reviewQueue.length - 1) {
+        setReviewDone(true);
+        return;
+      }
+      setReviewIndex(next);
+    }
+
+    function markKnown() {
+      if (!reviewing || reviewDone) return;
+      recordVerdict('known');
+      advanceReview();
+    }
+
+    function markForgot() {
+      if (!reviewing || reviewDone) return;
+      const item = reviewQueue[reviewIndex];
+      recordVerdict('forgot');
+      if (item && onReview) onReview(item, 'forgot');
+      advanceReview();
+    }
+
+    function askAboutCurrent() {
+      const item = reviewQueue[reviewIndex];
+      if (item && onAskAbout) onAskAbout(item);
+      exitReview();
+    }
+
+    function goPrev() {
+      if (reviewDone) return;
+      const next = stepReview(reviewIndex, reviewQueue.length, -1);
+      if (next === reviewIndex) return;
+      setReviewIndex(next);
+      setShowNote(false);
+    }
+
+    function goNext() {
+      if (reviewDone) return;
+      const next = stepReview(reviewIndex, reviewQueue.length, 1);
+      if (next === reviewIndex) return;
+      setReviewIndex(next);
+      setShowNote(false);
+    }
+
     /* counts for the header and the filter strip */
+    const markCount = items.filter((item) => item && item.kind === 'mark').length;
     const counts = { all: items.length, quote: 0 };
     for (let index = 0; index < colors.length; index += 1) counts[colors[index].id] = 0;
     for (let index = 0; index < items.length; index += 1) {
@@ -331,6 +580,176 @@ function createHighlightsUi(React, util) {
       );
     }
 
+    /* ── review view ───────────────────────────────────────────────────── */
+
+    function renderReviewView() {
+      const total = reviewQueue.length;
+      const current = reviewQueue[reviewIndex] || null;
+      const position = total ? Math.min(reviewIndex + 1, total) : 0;
+      const percent = total ? Math.round((position / total) * 100) : 0;
+      const summary = reviewSummary(reviewResults);
+      const color = colorOf(current && current.color);
+      const anchor = current && current.anchor ? current.anchor : null;
+      const pageLabel = anchor && anchor.scope === 'page' && anchor.page ? ' · 第 ' + anchor.page + ' 页' : '';
+      const note = current && typeof current.note === 'string' ? current.note : '';
+
+      const head = h(
+        'div',
+        { className: 'dm-hlui__head dm-hlui__head--review' },
+        h('span', { className: 'dm-hlui__title' }, '开始复习'),
+        h('span', { className: 'dm-hlui__progress' }, position + ' / ' + total),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dm-hlui__act',
+            title: '退出复习（Esc）',
+            'aria-label': '退出复习',
+            onClick: exitReview,
+          },
+          h(Icon, { name: 'close', size: 13 }),
+        ),
+      );
+
+      const bar = h(
+        'div',
+        {
+          className: 'dm-hlui__bar',
+          role: 'progressbar',
+          'aria-valuemin': 0,
+          'aria-valuemax': total,
+          'aria-valuenow': position,
+          'aria-label': '复习进度',
+        },
+        h('div', { className: 'dm-hlui__bar-fill', style: { width: percent + '%' } }),
+      );
+
+      let body;
+      if (reviewDone) {
+        body = h(
+          'div',
+          { className: 'dm-hlui-review dm-hlui-review--done' },
+          h(
+            'div',
+            { className: 'dm-hlui-review__summary' },
+            h(
+              'div',
+              { className: 'dm-hlui-review__summary-title' },
+              '过完了 ' + summary.total + ' 条，其中 ' + summary.forgot + ' 条标成待复习',
+            ),
+            h(
+              'div',
+              { className: 'dm-hlui-review__done-actions' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dm-hlui-review__btn dm-hlui-review__btn--solid',
+                  onClick: restartReview,
+                },
+                '再来一遍',
+              ),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dm-hlui-review__btn dm-hlui-review__btn--outline',
+                  onClick: exitReview,
+                },
+                '关闭',
+              ),
+            ),
+          ),
+        );
+      } else if (current) {
+        body = h(
+          'div',
+          { className: 'dm-hlui-review' },
+          h(
+            'div',
+            { className: 'dm-hlui-review__card dm-scroll' },
+            h('div', { className: 'dm-hlui-review__text' }, current.text),
+            h('div', { className: 'dm-hlui-review__meta' }, color.label + pageLabel),
+            note
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'dm-hlui-review__note-btn',
+                    'aria-expanded': showNote ? 'true' : 'false',
+                    onClick: () => setShowNote((value) => !value),
+                  },
+                  showNote ? '▾ 收起备注' : '▸ 看我的备注',
+                )
+              : null,
+            note && showNote ? h('div', { className: 'dm-hlui-review__note' }, note) : null,
+          ),
+          h(
+            'div',
+            { className: 'dm-hlui-review__actions' },
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dm-hlui-review__btn dm-hlui-review__btn--solid',
+                title: '记得（1）',
+                onClick: markKnown,
+              },
+              '记得',
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dm-hlui-review__btn dm-hlui-review__btn--outline',
+                title: '忘了（2）',
+                onClick: markForgot,
+              },
+              '忘了',
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dm-hlui-review__btn dm-hlui-review__btn--ghost',
+                title: '就这条问 AI',
+                disabled: !onAskAbout,
+                onClick: askAboutCurrent,
+              },
+              '问 AI',
+            ),
+          ),
+        );
+      } else {
+        body = h(
+          'div',
+          { className: 'dm-hlui-review dm-hlui-review--done' },
+          h(
+            'div',
+            { className: 'dm-hlui-review__summary' },
+            h('div', { className: 'dm-hlui-review__summary-title' }, '没有可复习的划线'),
+            h(
+              'div',
+              { className: 'dm-hlui-review__done-actions' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dm-hlui-review__btn dm-hlui-review__btn--outline',
+                  onClick: exitReview,
+                },
+                '关闭',
+              ),
+            ),
+          ),
+        );
+      }
+
+      return h('div', { className: 'dm-hlui is-reviewing' }, head, bar, body);
+    }
+
+    if (reviewing) return renderReviewView();
+
     /* ── render ────────────────────────────────────────────────────────── */
 
     return h(
@@ -355,6 +774,18 @@ function createHighlightsUi(React, util) {
           ),
           h('span', { className: 'dm-hlui__title' }, '划线（' + items.length + '）'),
         ),
+        markCount > 0
+          ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'dm-hlui__review-start',
+                title: '逐条过一遍手划的线',
+                onClick: startReview,
+              },
+              '开始复习',
+            )
+          : null,
         h(
           'button',
           {
@@ -433,6 +864,11 @@ function createHighlightsUi(React, util) {
   const HighlightsCss = `
 /* ── highlight list (56-highlights-ui.js) ─────────────────────────────── */
 .dm-hlui {
+  /* Decorative dot colours live here, in one place, so every other colour in this sheet
+     goes through a --dm-* token. They mirror the ::highlight() tints in 52-highlights.js. */
+  --dm-hlui-c-key: #e0a400;
+  --dm-hlui-c-question: #3a86ff;
+  --dm-hlui-c-review: #34a86c;
   flex: 0 1 auto;
   min-height: 0;
   max-height: 42%;
@@ -572,11 +1008,10 @@ function createHighlightsUi(React, util) {
   height: 7px;
   margin-top: 6px;
   border-radius: 50%;
-  color: #fff;
 }
-.dm-hlui-dot--key { background: #e0a400; }
-.dm-hlui-dot--question { background: #3a86ff; }
-.dm-hlui-dot--review { background: #34a86c; }
+.dm-hlui-dot--key { background: var(--dm-hlui-c-key); }
+.dm-hlui-dot--question { background: var(--dm-hlui-c-question); }
+.dm-hlui-dot--review { background: var(--dm-hlui-c-review); }
 .dm-hlui-row__main {
   flex: 1 1 auto;
   min-width: 0;
@@ -724,9 +1159,183 @@ function createHighlightsUi(React, util) {
   line-height: 1.55;
   word-break: break-word;
 }
+
+/* ── review mode ──────────────────────────────────────────────────────── */
+.dm-hlui__review-start {
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--dm-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dm-text-2);
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.dm-hlui__review-start:hover {
+  border-color: var(--dm-accent);
+  background: var(--dm-accent-soft);
+  color: var(--dm-accent);
+}
+.dm-hlui__review-start:focus-visible { outline: 2px solid var(--dm-accent); outline-offset: 1px; }
+
+.dm-hlui.is-reviewing {
+  flex: 1 1 auto;
+  max-height: 72%;
+}
+.dm-hlui__head--review { gap: 8px; }
+.dm-hlui__progress {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--dm-text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.dm-hlui__bar {
+  flex: none;
+  height: 3px;
+  margin: 0 8px 6px;
+  border-radius: 999px;
+  background: var(--dm-bg-2);
+  overflow: hidden;
+}
+.dm-hlui__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dm-accent);
+  transition: width 160ms ease;
+}
+.dm-hlui-review {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px 10px;
+}
+.dm-hlui-review--done { justify-content: center; }
+.dm-hlui-review__card {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 14px;
+  border: 1px solid var(--dm-line);
+  border-radius: var(--dm-radius);
+  background: var(--dm-bg);
+}
+.dm-hlui-review__text {
+  flex: 1 0 auto;
+  color: var(--dm-text);
+  font-size: 14px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dm-hlui-review__meta {
+  flex: none;
+  color: var(--dm-text-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.dm-hlui-review__note-btn {
+  flex: none;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dm-accent);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.dm-hlui-review__note-btn:hover { text-decoration: underline; }
+.dm-hlui-review__note-btn:focus-visible { outline: 2px solid var(--dm-accent); outline-offset: 1px; }
+.dm-hlui-review__note {
+  flex: none;
+  padding: 6px 8px;
+  border-left: 2px solid var(--dm-line-2);
+  border-radius: 0 6px 6px 0;
+  background: var(--dm-bg-2);
+  color: var(--dm-text-2);
+  font-size: 11.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dm-hlui-review__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dm-hlui-review__btn {
+  flex: 1 1 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dm-text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, filter 120ms ease;
+}
+.dm-hlui-review__btn:focus-visible { outline: 2px solid var(--dm-accent); outline-offset: 1px; }
+.dm-hlui-review__btn--solid {
+  background: var(--dm-accent);
+  color: var(--dm-on-accent);
+  font-weight: 600;
+}
+.dm-hlui-review__btn--solid:hover { filter: brightness(1.06); }
+.dm-hlui-review__btn--outline {
+  border-color: var(--dm-line-2);
+  color: var(--dm-text-2);
+}
+.dm-hlui-review__btn--outline:hover { background: var(--dm-bg-hover); color: var(--dm-text); }
+.dm-hlui-review__btn--ghost { color: var(--dm-text-3); }
+.dm-hlui-review__btn--ghost:hover { background: var(--dm-bg-hover); color: var(--dm-text); }
+.dm-hlui-review__btn[disabled] { opacity: 0.4; cursor: default; filter: none; }
+.dm-hlui-review__btn[disabled]:hover { background: transparent; color: var(--dm-text-3); }
+.dm-hlui-review__summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 10px;
+  text-align: center;
+}
+.dm-hlui-review__summary-title {
+  color: var(--dm-text);
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.dm-hlui-review__done-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
 `;
 
-  return { HighlightList: HighlightList, HighlightsCss: HighlightsCss };
+  return {
+    HighlightList: HighlightList,
+    HighlightsCss: HighlightsCss,
+    planReview: planReview,
+    reviewSummary: reviewSummary,
+    stepReview: stepReview,
+  };
 }
 
 if (typeof module !== 'undefined' && module.exports) module.exports = { createHighlightsUi };

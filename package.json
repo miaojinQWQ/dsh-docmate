@@ -69,7 +69,7 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "node build.mjs --check",
-    "test": "node test/host.test.mjs && node test/client.test.mjs && node src/host/docx.test.mjs && node src/client/30-markdown.test.mjs && node src/client/58-find.test.mjs && node src/client/48-shot.test.mjs && node src/client/12-panes.test.mjs",
+    "test": "node test/host.test.mjs && node test/client.test.mjs && node src/host/docx.test.mjs && node src/client/30-markdown.test.mjs && node src/client/58-find.test.mjs && node src/client/48-shot.test.mjs && node src/client/12-panes.test.mjs && node src/client/56-highlights-ui.test.mjs",
     "prepack": "node build.mjs --check",
     "prepublishOnly": "node scripts/prepublish.mjs"
   }

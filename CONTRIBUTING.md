@@ -30,6 +30,7 @@ docmate\
   src/client/58-find.test.mjs       # 44 组
   src/client/48-shot.test.mjs       # 35 组
   src/client/12-panes.test.mjs      # 48 组
+  src/client/56-highlights-ui.test.mjs # 42 组
   docs/                 # 验收样本（md/docx/pdf/txt + 生成脚本）
   shots/                # 验证截图
 ```
@@ -109,6 +110,7 @@ node src\client\30-markdown.test.mjs   # 81 组
 node src\client\58-find.test.mjs       # 44 组
 node src\client\48-shot.test.mjs       # 35 组
 node src\client\12-panes.test.mjs      # 48 组
+node src\client\56-highlights-ui.test.mjs  # 42 组
 ```
 
 **让运行中的 Harness 加载新代码**（两步，缺一不可）：
@@ -185,12 +187,12 @@ const r = document.querySelector('.dm-root');
   用宿主 waterfall 做的运行时硬限制，改之前先把那节读完- 深色/浅色双模式对比度修复（`--dm-on-accent`）
 - 布局修复：研究记忆面板被裁、右栏被 max-content 撑出可视区、表单控件 `content-box` 溢出
 - PDF.js 异版本共存：宿主已有其它版本时，DocMate 使用自己的库且不覆盖宿主全局变量
+- **划线「复习模式」**（`56-highlights-ui.js`）：左栏「开始复习」→ 卡片视图（进度 / 原文 / 备注 /
+  记得 / 忘了 / 问 AI / 总结页），键盘 ←→ `1` `2` `J` `K` `Esc`。
+  纯函数 `planReview` / `reviewSummary` / `stepReview` 有 42 组断言。
+  「忘了」会把那条的 `color` 改成 `review`，下次复习排到最前。
 
 ## 6. 待办（按性价比排序，自己挑，别一次全做）
-
-### P1 · 划线列表的「复习模式」
-左栏「划线」现在只是列表。加一个「开始复习」按钮：逐条显示划线原文 → 你心里答 → 点开看 AI 之前怎么说 / 或让 AI 出题。
-验收：能一条条过完，进度可见，随时退出。
 
 ### P1 · 框选截图的后续：存成「图片划线」
 现在框选完的图只存到 `docs/<id>/shots/`，聊天里能看到，但左栏列表里没有。

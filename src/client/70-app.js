@@ -563,6 +563,16 @@ function createApp(React, util, docsModule, chatModule, workspaceModule, pdfModu
       [saveHighlight],
     );
 
+    // "忘了" in review mode: the same POST as a note edit, but it rewrites the colour to
+    // 待复习 so the next pass starts with the cards the reader could not recall.
+    const reviewHighlight = useCallback(
+      (item, verdict) => {
+        if (!item || verdict !== 'forgot') return;
+        saveHighlight({ ...item, color: 'review' }, true);
+      },
+      [saveHighlight],
+    );
+
     /* ── painting the marks (CSS Custom Highlight API) ─────────────────── */
 
     const activeViewer = useCallback(() => {
@@ -1727,6 +1737,7 @@ function createApp(React, util, docsModule, chatModule, workspaceModule, pdfModu
               onJump: jumpToHighlight,
               onDelete: deleteHighlight,
               onNote: noteHighlight,
+              onReview: reviewHighlight,
               onAskAbout: askAboutHighlight,
               onAskAll: askAllHighlights,
             }))
