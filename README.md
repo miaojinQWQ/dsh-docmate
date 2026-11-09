@@ -32,6 +32,9 @@
 # 从 npm 装（推荐）
 dsh plugin --profile <你的 profile> add dsh-docmate
 
+# 直接从 GitHub 装（npm 不可达时用这个）
+dsh plugin --profile <你的 profile> add github:miaojinQWQ/dsh-docmate
+
 # 或者从本地目录装（开发用）
 plugin_manager install_bundle  <本仓库路径>
 ```
