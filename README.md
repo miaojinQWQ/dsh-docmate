@@ -5,7 +5,7 @@
 
 *An immersive reading desk for [DeepSeek Harness](https://github.com/deepseek-ai): drop a document in the centre, and a companion AI on the right has already read all of it — select any sentence to ask, or drag a box over a scanned page and let it look.*
 
-![DocMate 三栏研究区](shots/docmate-final.png)
+![DocMate 三栏研究区](shots/hero.png)
 
 ## 它是怎么工作的
 
@@ -62,9 +62,9 @@ plugin_manager install_bundle  <本仓库路径>
 | **划线复习模式** | 左栏「划线」面板 → 开始复习 | 一条一条过：卡片只显示划线原文，心里答完再点「记得 / 忘了」。忘了的会自动标成「待复习」，下次排到最前。进度可见、随时退出、有总结页。键盘：←→ 翻页、`1`/`2` 记得/忘了、`Esc` 退出。 |
 | **默认精简的回答** | 无感：每篇文档的会话里带一条「回答风格」 | 先一句话结论、最多 3 条要点、正文 ≤150 字；只有你说「展开 / 详细讲 / 逐句」才写长文。不复述原文、不写「我按你的要求没有…」这类过程说明。一键解读 / 起手牌 / 框选提问的问句也都按短回答写。 |
 
-![框选截图卡片](shots/shot-2026-11-09-card.png)
+![框选截图卡片](shots/shot-card.png)
 
-![划线复习模式](shots/review-dark.png)
+![划线复习模式](shots/review.png)
 
 ## 划线（持久化）
 
